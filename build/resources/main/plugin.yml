@@ -1,0 +1,21 @@
+name: Rtp
+version: 0.0.1
+main: com.fell1cs.rtp.RtpPlugin
+api-version: '1.21'
+author: fell1cs
+description: Продвинутый плагин для рандомной телепортации.
+commands:
+  rtp:
+    description: Рандомная телепортация.
+    aliases: [randomtp, wild]
+    permission: rtp.use
+permissions:
+  rtp.use:
+    description: Разрешение на /rtp.
+    default: true
+  rtp.bypass.countdown:
+    description: Обход кулдауна.
+    default: op
+  rtp.admin:
+    description: Перезагрузка плагина.
+    default: op
