@@ -1,4 +1,3 @@
-# ─── Основные настройки RTP ─────────────────────────────
 rtp:
   # Радиус поиска случайной точки (в блоках)
   radius: 5000
@@ -28,7 +27,8 @@ messages:
   no-safe-location: "<red>Не удалось найти безопасную точку. Попробуйте позже."
   world-not-allowed: "<red>В этом мире RTP запрещён."
   reloaded: "<green>Конфигурация перезагружена."
-  update-available: "<gradient:#FFAA00:#FF5500><bold>Доступно обновление!</bold></gradient> <gray>»</gray> <yellow><version></yellow> <gray>—</gray> <click:open_url:'<url>'><aqua>Скачать</aqua></click>"
+  #Лучше не трогать!
+  update-available: "Доступно обновление <yellow><version></yellow>! <gray>—</gray> <click:open_url:'<url>'><aqua>Скачать</aqua></click>"
 
 
 # ASCI-логотип (выводится в консоль при запуске)
