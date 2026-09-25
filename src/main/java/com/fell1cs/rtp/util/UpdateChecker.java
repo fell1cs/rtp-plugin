@@ -4,6 +4,7 @@ import com.fell1cs.rtp.RtpPlugin;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.entity.Player;
 
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -17,11 +18,27 @@ public class UpdateChecker {
     private final String currentVersion;
     private final MiniMessage mm = MiniMessage.miniMessage();
 
+    private volatile String latestVersion;
+    private volatile String downloadUrl;
+    private volatile boolean updateAvailable;
+
     public UpdateChecker(RtpPlugin plugin, String owner, String repo, String currentVersion) {
         this.plugin = plugin;
         this.owner = owner;
         this.repo = repo;
         this.currentVersion = currentVersion;
+    }
+
+    public boolean isUpdateAvailable() {
+        return updateAvailable;
+    }
+
+    public String getLatestVersion() {
+        return latestVersion;
+    }
+
+    public String getDownloadUrl() {
+        return downloadUrl;
     }
 
     public void checkAsync() {
@@ -41,23 +58,24 @@ public class UpdateChecker {
 
                 try (InputStreamReader reader = new InputStreamReader(conn.getInputStream())) {
                     JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
-                    String latestVersion = json.get("tag_name").getAsString().replace("v", "");
+                    String tag = json.get("tag_name").getAsString().replace("v", "");
                     String htmlUrl = json.get("html_url").getAsString();
 
-                    if (!latestVersion.equalsIgnoreCase(currentVersion)) {
-                        plugin.getLogger().info("Доступно обновление: " + latestVersion + " — " + htmlUrl);
+                    if (!tag.equalsIgnoreCase(currentVersion)) {
+                        this.latestVersion = tag;
+                        this.downloadUrl = htmlUrl;
+                        this.updateAvailable = true;
 
-                        // Уведомляем игроков с правом rtp.admin при входе
+                        plugin.getLogger().info("Доступно обновление: " + tag + " — " + htmlUrl);
+
+                        // Уведомить уже онлайн операторов
                         plugin.getServer().getScheduler().runTask(plugin, () -> {
-                            plugin.getServer().getOnlinePlayers().stream()
-                                    .filter(p -> p.hasPermission("rtp.admin"))
-                                    .forEach(p -> p.sendMessage(mm.deserialize(
-                                            plugin.getConfigManager().message("update-available",
-                                                    "version", latestVersion,
-                                                    "url", htmlUrl)
-                                    )));
+                            for (Player p : plugin.getServer().getOnlinePlayers()) {
+                                notifyPlayer(p);
+                            }
                         });
                     } else {
+                        this.updateAvailable = false;
                         plugin.getLogger().info("Плагин обновлён до последней версии.");
                     }
                 }
@@ -65,5 +83,20 @@ public class UpdateChecker {
                 plugin.getLogger().warning("Ошибка при проверке обновлений: " + e.getMessage());
             }
         });
+    }
+
+    public void notifyPlayer(Player player) {
+        if (!updateAvailable || latestVersion == null || downloadUrl == null) {
+            return;
+        }
+        if (!player.isOp() && !player.hasPermission("rtp.admin")) {
+            return;
+        }
+
+        player.sendMessage(mm.deserialize(
+                plugin.getConfigManager().message("update-available",
+                        "version", latestVersion,
+                        "url", downloadUrl)
+        ));
     }
 }
