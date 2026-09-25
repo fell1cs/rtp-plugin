@@ -8,12 +8,14 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TeleportManager {
 
@@ -21,9 +23,10 @@ public class TeleportManager {
     private final MiniMessage mm = MiniMessage.miniMessage();
     private final Random random = new Random();
 
-    private final Map<UUID, BukkitRunnable> pending = new HashMap<>();
+    private final Map<UUID, BukkitTask> pending = new HashMap<>();
     private final Map<UUID, Location> startLocations = new HashMap<>();
     private final Map<UUID, Long> cooldowns = new HashMap<>();
+    private final Map<UUID, AtomicBoolean> finishing = new HashMap<>();
 
     public TeleportManager(RtpPlugin plugin) {
         this.plugin = plugin;
@@ -69,10 +72,8 @@ public class TeleportManager {
         int x = (int) (Math.cos(angle) * dist);
         int z = (int) (Math.sin(angle) * dist);
 
-        // Асинхронно загружаем чанк, затем проверяем безопасность на главном потоке
         return world.getChunkAtAsync(x >> 4, z >> 4)
                 .thenCompose(chunk -> {
-                    // getHighestBlockYAt и проверка блоков должны выполняться на main thread
                     CompletableFuture<Location> result = new CompletableFuture<>();
 
                     plugin.getServer().getScheduler().runTask(plugin, () -> {
@@ -83,7 +84,6 @@ public class TeleportManager {
                             if (isSafe(loc)) {
                                 result.complete(loc);
                             } else {
-                                // Рекурсивно пробуем следующую точку
                                 findSafeLocation(world, attempt + 1)
                                         .whenComplete((next, ex) -> {
                                             if (ex != null) {
@@ -100,10 +100,7 @@ public class TeleportManager {
 
                     return result;
                 })
-                .exceptionallyCompose(ex -> {
-                    // При ошибке загрузки чанка — пробуем ещё раз (без блокировки)
-                    return findSafeLocation(world, attempt + 1);
-                });
+                .exceptionallyCompose(ex -> findSafeLocation(world, attempt + 1));
     }
 
     private boolean isSafe(Location loc) {
@@ -113,7 +110,6 @@ public class TeleportManager {
         Block head = loc.clone().add(0, 1, 0).getBlock();
         Block ground = loc.clone().add(0, -1, 0).getBlock();
 
-        // Ноги и голова должны быть воздухом (или проходимым блоком)
         if (!isPassable(feet) || !isPassable(head)) {
             return false;
         }
@@ -154,15 +150,13 @@ public class TeleportManager {
     }
 
     public void startRtp(Player player, int countdown) {
-        cancel(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        cancel(uuid);
 
         World world = player.getWorld();
-
-        // Показываем, что идёт поиск
         player.sendActionBar(mm.deserialize("<gray>Поиск безопасной точки..."));
 
         findSafeLocation(world).thenAccept(target -> {
-            // Колбэк может прийти не с main thread — переключаемся
             plugin.getServer().getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) {
                     return;
@@ -179,43 +173,40 @@ public class TeleportManager {
                     return;
                 }
 
-                startLocations.put(player.getUniqueId(), player.getLocation().clone());
+                startLocations.put(uuid, player.getLocation().clone());
+                finishing.put(uuid, new AtomicBoolean(false));
 
-                BukkitRunnable task = new BukkitRunnable() {
+                BukkitRunnable runnable = new BukkitRunnable() {
                     int left = countdown;
 
                     @Override
                     public void run() {
                         if (!player.isOnline()) {
-                            TeleportManager.this.cancel(player.getUniqueId());
+                            TeleportManager.this.cancel(uuid);
                             return;
                         }
 
-                        // Отмена при движении
                         if (plugin.getConfigManager().isCancelOnMove()
                                 && shouldCancelOnMove(player)) {
                             player.sendMessage(mm.deserialize(
                                     plugin.getConfigManager().message("cancelled")));
-                            TeleportManager.this.cancel(player.getUniqueId());
+                            TeleportManager.this.cancel(uuid);
                             return;
                         }
 
-                        if (left <= 0) {
-                            // Останавливаем этот таймер, чтобы не вызывать finish повторно
-                            cancel();
-                            pending.remove(player.getUniqueId());
-                            finish(player, target);
+                        if (left > 0) {
+                            player.sendActionBar(mm.deserialize(
+                                    plugin.getConfigManager().message("countdown", "time", left)));
+                            left--;
                             return;
                         }
 
-                        player.sendActionBar(mm.deserialize(
-                                plugin.getConfigManager().message("countdown", "time", left)));
-                        left--;
+                        finish(player, target);
                     }
                 };
 
-                pending.put(player.getUniqueId(), task);
-                task.runTaskTimer(plugin, 0L, 20L);
+                BukkitTask task = runnable.runTaskTimer(plugin, 0L, 20L);
+                pending.put(uuid, task);
             });
         }).exceptionally(ex -> {
             plugin.getServer().getScheduler().runTask(plugin, () -> {
@@ -230,19 +221,32 @@ public class TeleportManager {
     }
 
     public void cancel(UUID uuid) {
-        BukkitRunnable task = pending.remove(uuid);
+        BukkitTask task = pending.remove(uuid);
         if (task != null) {
             task.cancel();
         }
         startLocations.remove(uuid);
+        finishing.remove(uuid);
     }
 
     private void finish(Player player, Location target) {
-        BukkitRunnable task = pending.remove(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+
+        AtomicBoolean flag = finishing.get(uuid);
+        if (flag != null && !flag.compareAndSet(false, true)) {
+            return;
+        }
+
+        BukkitTask task = pending.remove(uuid);
         if (task != null) {
             task.cancel();
         }
-        startLocations.remove(player.getUniqueId());
+        startLocations.remove(uuid);
+        finishing.remove(uuid);
+
+        if (!player.isOnline()) {
+            return;
+        }
 
         player.sendMessage(mm.deserialize(
                 plugin.getConfigManager().message("teleporting")));
@@ -267,14 +271,17 @@ public class TeleportManager {
         if (start == null) return false;
 
         Location now = player.getLocation();
-        return now.getWorld() != start.getWorld()
-                || now.distanceSquared(start) > 0.25;
+        if (now.getWorld() != start.getWorld()) {
+            return true;
+        }
+        return now.distanceSquared(start) > 0.25;
     }
 
     public void clearAll() {
-        pending.values().forEach(BukkitRunnable::cancel);
+        pending.values().forEach(BukkitTask::cancel);
         pending.clear();
         startLocations.clear();
         cooldowns.clear();
+        finishing.clear();
     }
 }
