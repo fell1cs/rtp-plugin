@@ -1,0 +1,11 @@
+[versions]
+minecraft = "1.21.11"
+paper-api = "1.21.11-R0.1-SNAPSHOT"
+
+run-task = "3.1.0"
+
+[libraries]
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper-api" }
+
+[plugins]
+run-paper = { id = "xyz.jpenilla.run-paper", version.ref = "run-task" }

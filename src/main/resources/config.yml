@@ -1,0 +1,45 @@
+# ─── Основные настройки RTP ─────────────────────────────
+rtp:
+  # Радиус поиска случайной точки (в блоках)
+  radius: 5000
+  # Минимальное расстояние от центра мира
+  min-radius: 500
+  # Отсчёт перед телепортом (в секундах). 0 = мгновенно.
+  countdown: 0
+  # Отменять телепорт, если игрок двинулся
+  cancel-on-move: true
+  # Кулдаун между RTP (в секундах)
+  cooldown: 10
+  # Максимальное количество попыток найти безопасную точку
+  max-attempts: 20
+  # Разрешённые миры
+  allowed-worlds:
+    - world
+
+# Локализация
+messages:
+  prefix: "RTPF <dark_gray>|</dark_gray> "
+  no-permission: "<red>У вас нет прав на использование этой команды."
+  cooldown: "<red>Подождите <yellow><time></yellow> сек. перед следующим RTP."
+  countdown: "<yellow>Телепортация через <gold><time></gold> сек. Не двигайтесь!"
+  teleporting: "<green>Телепортация..."
+  teleported: "<green>Вы телепортированы в случайную точку!"
+  cancelled: "<red>Телепортация отменена."
+  no-safe-location: "<red>Не удалось найти безопасную точку. Попробуйте позже."
+  world-not-allowed: "<red>В этом мире RTP запрещён."
+  reloaded: "<green>Конфигурация перезагружена."
+  update-available: "<gradient:#FFAA00:#FF5500><bold>Доступно обновление!</bold></gradient> <gray>»</gray> <yellow><version></yellow> <gray>—</gray> <click:open_url:'<url>'><aqua>Скачать</aqua></click>"
+
+
+# ASCI-логотип (выводится в консоль при запуске)
+ascii-logo: |
+  <gradient:#FFAA00:#FF5500>
+  ███████╗ ███████╗██╗     ██╗     ██╗ ██████╗███████╗
+  ██╔════╝ ██╔════╝██║     ██║     ██║██╔════╝██╔════╝
+  █████╗   █████╗  ██║     ██║     ██║██║     ███████╗
+  ██╔══╝   ██║     ██║     ██║     ██║██║     ╚════██║
+  ██║      ███████╗███████╗███████╗██║╚██████╗███████║
+  ╚═╝      ╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝╚══════╝
+  </gradient>
+  <gray>                    ꜰᴇʟʟɪᴄs ᴅᴇᴠ sᴛᴜᴅɪᴏ</gray>
+  <yellow>   Новые плагины уже в нашем тг - <click:open_url:'https://t.me/fell1cs_studio'><aqua>https://t.me/fell1cs_studio</aqua></click></yellow>
