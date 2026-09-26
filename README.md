@@ -10,5 +10,5 @@
 -    rtp.bypass.countdown
 -    rtp.admin
 
-Исходный код - https://github.com/fell1cs/rtp-plugin
+Канал разработчика в тг - https://t.me/fell1cs_studio
 Полная поддержка форматирования MiniMessage
